@@ -2216,11 +2216,9 @@ private struct DiscoverSimilarityMenuPlainLabel: View {
     var isSelected: Bool
 
     var body: some View {
-        Label {
+        HStack(spacing: 6) {
+            DiscoverSimilarityMenuCheckmarkSlot(isSelected: isSelected)
             Text(title)
-        } icon: {
-            Image(systemName: "checkmark")
-                .opacity(isSelected ? 1 : 0)
         }
     }
 }
@@ -2230,13 +2228,26 @@ private struct DiscoverSimilarityMenuRowLabel: View {
     var isSelected: Bool
 
     var body: some View {
-        Label {
+        HStack(spacing: 6) {
+            DiscoverSimilarityMenuCheckmarkSlot(isSelected: isSelected)
             Text(item.menuTitle)
                 .font(.paperCodexSystem(size: 13, weight: .regular, design: .monospaced))
-        } icon: {
-            Image(systemName: "checkmark")
-                .opacity(isSelected ? 1 : 0)
         }
+    }
+}
+
+private struct DiscoverSimilarityMenuCheckmarkSlot: View {
+    var isSelected: Bool
+
+    var body: some View {
+        Group {
+            if isSelected {
+                Image(systemName: "checkmark")
+            } else {
+                Color.clear
+            }
+        }
+        .frame(width: 13, height: 13)
     }
 }
 
