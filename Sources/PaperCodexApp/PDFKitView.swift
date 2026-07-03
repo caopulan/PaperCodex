@@ -725,24 +725,26 @@ struct PDFKitView: NSViewRepresentable {
                 at: point,
                 in: pdfView,
                 contentSize: NSSize(width: 400, height: preview.sourceText == nil ? 156 : 196),
-                rootView: PDFLinkPreviewCard(preview: preview) { [weak self, weak pdfView] in
-                    guard let pdfView else {
-                        return
+                rootView: PDFLinkPreviewCard(
+                    preview: preview,
+                    onJump: { [weak self, weak pdfView] in
+                        guard let pdfView else {
+                            return
+                        }
+                        self?.jumpToPDFLinkPreview(preview, in: pdfView)
+                    },
+                    onOpenSplit: { [weak self] in
+                        self?.openPDFLinkPreviewInSplit(preview)
                     }
-                    self?.openPDFLinkPreview(preview, in: pdfView)
-                }
+                )
             )
         }
 
         @MainActor
-        private func openPDFLinkPreview(_ preview: PDFLinkPreview, in pdfView: PDFView) {
+        private func jumpToPDFLinkPreview(_ preview: PDFLinkPreview, in pdfView: PDFView) {
             closeCitationPopover()
             if let url = preview.url {
                 NSWorkspace.shared.open(url)
-                return
-            }
-            if let internalTarget = preview.internalTarget {
-                onInternalLinkSplit(internalTarget)
                 return
             }
             if let destination = preview.destination {
@@ -750,6 +752,15 @@ struct PDFKitView: NSViewRepresentable {
                 scheduleViewportReport()
                 reportDocumentStatus()
             }
+        }
+
+        @MainActor
+        private func openPDFLinkPreviewInSplit(_ preview: PDFLinkPreview) {
+            closeCitationPopover()
+            guard let internalTarget = preview.internalTarget else {
+                return
+            }
+            onInternalLinkSplit(internalTarget)
         }
 
         @MainActor
@@ -1000,6 +1011,14 @@ private struct PDFLinkPreview {
     var url: URL?
     var destination: PDFDestination?
     var internalTarget: PDFInternalLinkTarget?
+
+    var isInternalDestination: Bool {
+        destination != nil
+    }
+
+    var canOpenSplit: Bool {
+        internalTarget != nil
+    }
 }
 
 private struct InTextCitationPreview: View {
@@ -1049,7 +1068,8 @@ private struct InTextCitationPreview: View {
 
 private struct PDFLinkPreviewCard: View {
     var preview: PDFLinkPreview
-    var onOpen: () -> Void
+    var onJump: () -> Void
+    var onOpenSplit: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1068,12 +1088,29 @@ private struct PDFLinkPreviewCard: View {
             }
             HStack {
                 Spacer()
-                Button {
-                    onOpen()
-                } label: {
-                    Label(preview.actionTitle, systemImage: "arrow.up.right")
+                if preview.isInternalDestination {
+                    Button {
+                        onJump()
+                    } label: {
+                        Label("Jump", systemImage: "arrow.down.right.and.arrow.up.left")
+                    }
+                    .buttonStyle(.bordered)
+                    if preview.canOpenSplit {
+                        Button {
+                            onOpenSplit()
+                        } label: {
+                            Label("Open Split", systemImage: "rectangle.split.2x1")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                } else {
+                    Button {
+                        onJump()
+                    } label: {
+                        Label(preview.actionTitle, systemImage: "arrow.up.right")
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
             }
         }
         .padding(15)

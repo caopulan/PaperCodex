@@ -2865,6 +2865,12 @@ func runUILayoutSourceChecks() throws {
         "PDFKit view should render PDF hyperlink previews as a card"
     )
     try check(
+        pdfKitSource.contains("onJump") && pdfKitSource.contains("onOpenSplit")
+            && pdfKitSource.contains("Label(\"Jump\", systemImage: \"arrow.down.right.and.arrow.up.left\")")
+            && pdfKitSource.contains("Label(\"Open Split\", systemImage: \"rectangle.split.2x1\")"),
+        "PDF hyperlink previews for internal targets should expose direct jump and split actions"
+    )
+    try check(
         pdfKitSource.contains("PDFActionURL") && pdfKitSource.contains("PDFActionGoTo"),
         "PDFKit view should intercept external and internal PDF link actions"
     )
