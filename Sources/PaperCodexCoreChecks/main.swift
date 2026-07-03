@@ -999,6 +999,24 @@ func runUILayoutSourceChecks() throws {
             && !librarySource.contains("categoryTreeChevronIconSpacing"),
         "library folder rows should use the folder icon itself for expanded/collapsed state and remove chevron expand controls"
     )
+    let libraryCategoryRowRange = try require(
+        librarySource.range(of: "private struct CategorySidebarRow: View"),
+        "library category row source should exist"
+    )
+    let libraryRootDropRange = try require(
+        librarySource.range(
+            of: "private struct LibraryRootFolderDropDelegate: DropDelegate",
+            range: libraryCategoryRowRange.upperBound..<librarySource.endIndex
+        ),
+        "library root drop delegate should follow category rows"
+    )
+    let libraryCategoryRowSource = String(librarySource[libraryCategoryRowRange.lowerBound..<libraryRootDropRange.lowerBound])
+    try check(
+        libraryCategoryRowSource.contains(".contentShape(Rectangle())\n        .onTapGesture(perform: onSelect)")
+            && libraryCategoryRowSource.contains("Button(action: toggleFolderExpansion)")
+            && libraryCategoryRowSource.contains(".onDrag {"),
+        "library folder rows should select from the whole row while keeping folder expansion and dragging separate"
+    )
     try check(
         librarySource.contains("SidebarSplitLayout(minContentWidth: LibraryLayout.libraryContentMinimumWidth)")
             && librarySource.contains("static let libraryContentMinimumWidth: CGFloat = 560")
@@ -1393,23 +1411,6 @@ func runUILayoutSourceChecks() throws {
             && interactionFeedbackSource.contains("case .error:\n        10")
             && appModelSource.contains("autoDismissAfter ?? defaultNoticeDismissDuration(for: kind)"),
         "success and failure notices should auto-dismiss after 5s and 10s respectively"
-    )
-    let settingsSimilarityRowRange = try require(
-        settingsViewSource.range(of: "private struct SettingsSimilarityCategoryRow: View"),
-        "settings similarity folder row source should exist"
-    )
-    let settingsSimilarityConnectorRange = try require(
-        settingsViewSource.range(
-            of: "private struct SettingsSimilarityCategoryTreeConnector: View",
-            range: settingsSimilarityRowRange.upperBound..<settingsViewSource.endIndex
-        ),
-        "settings similarity connector source should follow folder rows"
-    )
-    let settingsSimilarityRowSource = String(settingsViewSource[settingsSimilarityRowRange.lowerBound..<settingsSimilarityConnectorRange.lowerBound])
-    try check(
-        settingsSimilarityRowSource.contains(".contentShape(Rectangle())\n        .onTapGesture(perform: onToggleSelected)")
-            && settingsSimilarityRowSource.contains("Button(action: onToggleExpanded)"),
-        "settings similarity folder rows should select from the whole row while keeping the disclosure control separate"
     )
     try check(
         !collectionViewExists

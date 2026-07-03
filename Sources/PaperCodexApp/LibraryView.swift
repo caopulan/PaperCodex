@@ -3331,6 +3331,7 @@ private struct CategorySidebarRow: View {
         .animation(.easeOut(duration: 0.10), value: dropPlacement)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+        .onTapGesture(perform: onSelect)
         .onDrag {
             onDragCategory()
             return NSItemProvider(object: categoryDragPayload as NSString)
