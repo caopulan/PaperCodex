@@ -1509,6 +1509,7 @@ private struct SettingsSimilarityCategoryRow: View {
         .animation(PaperCodexMotion.selection, value: selectionState)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+        .onTapGesture(perform: onToggleSelected)
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.12)) {
                 isHovering = hovering

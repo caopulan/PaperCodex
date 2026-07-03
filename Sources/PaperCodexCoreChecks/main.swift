@@ -1394,6 +1394,23 @@ func runUILayoutSourceChecks() throws {
             && appModelSource.contains("autoDismissAfter ?? defaultNoticeDismissDuration(for: kind)"),
         "success and failure notices should auto-dismiss after 5s and 10s respectively"
     )
+    let settingsSimilarityRowRange = try require(
+        settingsViewSource.range(of: "private struct SettingsSimilarityCategoryRow: View"),
+        "settings similarity folder row source should exist"
+    )
+    let settingsSimilarityConnectorRange = try require(
+        settingsViewSource.range(
+            of: "private struct SettingsSimilarityCategoryTreeConnector: View",
+            range: settingsSimilarityRowRange.upperBound..<settingsViewSource.endIndex
+        ),
+        "settings similarity connector source should follow folder rows"
+    )
+    let settingsSimilarityRowSource = String(settingsViewSource[settingsSimilarityRowRange.lowerBound..<settingsSimilarityConnectorRange.lowerBound])
+    try check(
+        settingsSimilarityRowSource.contains(".contentShape(Rectangle())\n        .onTapGesture(perform: onToggleSelected)")
+            && settingsSimilarityRowSource.contains("Button(action: onToggleExpanded)"),
+        "settings similarity folder rows should select from the whole row while keeping the disclosure control separate"
+    )
     try check(
         !collectionViewExists
             && !appSource.contains("case .collections")
