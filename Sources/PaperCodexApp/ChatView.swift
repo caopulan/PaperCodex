@@ -300,13 +300,13 @@ struct ChatView: View {
                     runtimeName: model.selectedChatRuntimeDisplayName,
                     diagnostic: model.selectedChatRuntimeDiagnostic,
                     authSummary: model.selectedChatRuntimeAuthSummary,
-                    modelOverride: model.codexModelOverride,
-                    availableModelIDs: model.availableCodexModelIDs,
-                    defaultModelID: model.codexDefaultModelID,
+                    modelOverride: model.agentRuntimeModelOverride(for: model.selectedChatRuntimeID),
+                    availableModelIDs: model.availableAgentRuntimeModelIDs(for: model.selectedChatRuntimeID),
+                    defaultModelID: model.agentRuntimeDefaultModelID(for: model.selectedChatRuntimeID),
                     reasoningEffort: model.codexReasoningEffort,
                     onPrompt: { model.sendQuickPrompt($0) },
                     onRuntime: { model.setSelectedChatRuntimeID($0) },
-                    onModelOverride: { model.setCodexModelOverride($0) },
+                    onModelOverride: { model.setAgentRuntimeModelOverride($0, for: model.selectedChatRuntimeID) },
                     onReasoningEffort: { model.setCodexReasoningEffort($0) }
                 ) {
                     Task {
@@ -1270,7 +1270,7 @@ private struct AgentStatusLine: View {
                 .buttonStyle(.borderless)
                 .controlSize(.small)
             }
-            if selectedRuntimeID == "codex" {
+            if shouldShowModelMenu {
                 Menu {
                     Button {
                         onModelOverride("")
@@ -1300,6 +1300,8 @@ private struct AgentStatusLine: View {
                 .menuStyle(.button)
                 .buttonStyle(.borderless)
                 .controlSize(.small)
+            }
+            if selectedRuntimeID == "codex" {
                 Menu {
                     ForEach(CodexReasoningEffort.allCases, id: \.self) { effort in
                         Button {
@@ -1362,6 +1364,13 @@ private struct AgentStatusLine: View {
     private var shouldOfferCompatibleModel: Bool {
         diagnostic?.title == "Codex model incompatible"
             && modelOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var shouldShowModelMenu: Bool {
+        selectedRuntimeID == "codex"
+            || !availableModelIDs.isEmpty
+            || !modelOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !defaultModelID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var iconName: String {

@@ -168,15 +168,27 @@ struct DiscoverView: View {
             .sheet(isPresented: $isShowingProcessSelection) {
                 DiscoverProcessActionSheet(
                     paperCount: papers.count,
-                    availableModelIDs: model.availableCodexModelIDs,
-                    defaultModelID: model.codexDefaultModelID,
-                    defaultModelOverride: model.discoverCodexModelOverride,
-                    defaultReasoningEffort: model.discoverCodexReasoningEffort,
+                    runtimeName: model.selectedEnrichmentRuntimeDisplayName,
+                    availableModelIDs: model.availableAgentRuntimeModelIDs(for: model.selectedEnrichmentRuntimeID),
+                    defaultModelID: model.agentRuntimeDefaultModelID(for: model.selectedEnrichmentRuntimeID),
+                    defaultModelOverride: model.selectedEnrichmentRuntimeID == "codex"
+                        ? model.discoverCodexModelOverride
+                        : model.agentRuntimeModelOverride(for: model.selectedEnrichmentRuntimeID),
+                    defaultReasoningEffort: model.selectedEnrichmentRuntimeID == "codex"
+                        ? model.discoverCodexReasoningEffort
+                        : .default,
                     defaultSelectedActions: model.defaultDiscoverProcessActions,
-                    isRefreshingModels: model.isRefreshingCodexModels,
+                    showsReasoningEffort: model.selectedEnrichmentRuntimeID == "codex",
+                    isRefreshingModels: model.selectedEnrichmentRuntimeID == "codex"
+                        ? model.isRefreshingCodexModels
+                        : model.isRefreshingAgentRuntimeDiagnostics,
                     onRefreshModels: {
                         Task {
-                            await model.refreshAvailableCodexModels()
+                            if model.selectedEnrichmentRuntimeID == "codex" {
+                                await model.refreshAvailableCodexModels()
+                            } else {
+                                await model.refreshAgentRuntimeDiagnostics()
+                            }
                         }
                     },
                     onConfirm: { actions, modelOverride, reasoningEffort, resultLimitCount in
@@ -734,15 +746,27 @@ struct ArxivSearchView: View {
         .sheet(isPresented: $isShowingProcessSelection) {
             DiscoverProcessActionSheet(
                 paperCount: papers.count,
-                availableModelIDs: model.availableCodexModelIDs,
-                defaultModelID: model.codexDefaultModelID,
-                defaultModelOverride: model.discoverCodexModelOverride,
-                defaultReasoningEffort: model.discoverCodexReasoningEffort,
+                runtimeName: model.selectedEnrichmentRuntimeDisplayName,
+                availableModelIDs: model.availableAgentRuntimeModelIDs(for: model.selectedEnrichmentRuntimeID),
+                defaultModelID: model.agentRuntimeDefaultModelID(for: model.selectedEnrichmentRuntimeID),
+                defaultModelOverride: model.selectedEnrichmentRuntimeID == "codex"
+                    ? model.discoverCodexModelOverride
+                    : model.agentRuntimeModelOverride(for: model.selectedEnrichmentRuntimeID),
+                defaultReasoningEffort: model.selectedEnrichmentRuntimeID == "codex"
+                    ? model.discoverCodexReasoningEffort
+                    : .default,
                 defaultSelectedActions: model.defaultDiscoverProcessActions,
-                isRefreshingModels: model.isRefreshingCodexModels,
+                showsReasoningEffort: model.selectedEnrichmentRuntimeID == "codex",
+                isRefreshingModels: model.selectedEnrichmentRuntimeID == "codex"
+                    ? model.isRefreshingCodexModels
+                    : model.isRefreshingAgentRuntimeDiagnostics,
                 onRefreshModels: {
                     Task {
-                        await model.refreshAvailableCodexModels()
+                        if model.selectedEnrichmentRuntimeID == "codex" {
+                            await model.refreshAvailableCodexModels()
+                        } else {
+                            await model.refreshAgentRuntimeDiagnostics()
+                        }
                     }
                 },
                 onConfirm: { actions, modelOverride, reasoningEffort, resultLimitCount in
@@ -1724,11 +1748,13 @@ private struct DiscoverProcessActionSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var paperCount: Int
+    var runtimeName: String
     var availableModelIDs: [String]
     var defaultModelID: String
     var defaultModelOverride: String
     var defaultReasoningEffort: CodexReasoningEffort
     var defaultSelectedActions: Set<DiscoverProcessAction>
+    var showsReasoningEffort: Bool
     var isRefreshingModels: Bool
     var onRefreshModels: () -> Void
     var onConfirm: ([DiscoverProcessAction], String, CodexReasoningEffort, Int) -> Void
@@ -1744,22 +1770,26 @@ private struct DiscoverProcessActionSheet: View {
 
     init(
         paperCount: Int,
+        runtimeName: String,
         availableModelIDs: [String],
         defaultModelID: String,
         defaultModelOverride: String,
         defaultReasoningEffort: CodexReasoningEffort,
         defaultSelectedActions: Set<DiscoverProcessAction>,
+        showsReasoningEffort: Bool,
         isRefreshingModels: Bool,
         onRefreshModels: @escaping () -> Void,
         onConfirm: @escaping ([DiscoverProcessAction], String, CodexReasoningEffort, Int) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.paperCount = paperCount
+        self.runtimeName = runtimeName
         self.availableModelIDs = availableModelIDs
         self.defaultModelID = defaultModelID
         self.defaultModelOverride = defaultModelOverride
         self.defaultReasoningEffort = defaultReasoningEffort
         self.defaultSelectedActions = defaultSelectedActions
+        self.showsReasoningEffort = showsReasoningEffort
         self.isRefreshingModels = isRefreshingModels
         self.onRefreshModels = onRefreshModels
         self.onConfirm = onConfirm
@@ -1775,9 +1805,9 @@ private struct DiscoverProcessActionSheet: View {
         DiscoverProcessAction.allCases.filter { selectedActions.contains($0) }
     }
 
-    private var codexDefaultModelLabel: String {
+    private var runtimeDefaultModelLabel: String {
         let trimmed = defaultModelID.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Codex default" : "Codex default (\(trimmed))"
+        return trimmed.isEmpty ? "\(runtimeName) default" : "\(runtimeName) default (\(trimmed))"
     }
 
     private var canProcessResults: Bool {
@@ -1921,7 +1951,7 @@ private struct DiscoverProcessActionSheet: View {
                     }
 
                     Picker("Model", selection: $draftModelOverride) {
-                        Text(codexDefaultModelLabel).tag("")
+                        Text(runtimeDefaultModelLabel).tag("")
                         ForEach(availableModelIDs, id: \.self) { modelID in
                             Text(modelID).tag(modelID)
                         }
@@ -1935,12 +1965,14 @@ private struct DiscoverProcessActionSheet: View {
                     TextField("Custom model override", text: $draftModelOverride)
                         .textFieldStyle(.roundedBorder)
 
-                    Picker("Thinking", selection: $draftReasoningEffort) {
-                        ForEach(CodexReasoningEffort.allCases, id: \.self) { effort in
-                            Text(effort.displayName).tag(effort)
+                    if showsReasoningEffort {
+                        Picker("Thinking", selection: $draftReasoningEffort) {
+                            ForEach(CodexReasoningEffort.allCases, id: \.self) { effort in
+                                Text(effort.displayName).tag(effort)
+                            }
                         }
+                        .pickerStyle(.menu)
                     }
-                    .pickerStyle(.menu)
                 }
             }
             .padding(20)

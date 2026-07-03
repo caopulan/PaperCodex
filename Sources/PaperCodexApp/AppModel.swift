@@ -1168,6 +1168,10 @@ final class AppModel: ObservableObject {
         agentRuntimeStore.selectedChatRuntime.displayName
     }
 
+    var selectedEnrichmentRuntimeDisplayName: String {
+        agentRuntimeStore.selectedEnrichmentRuntime.displayName
+    }
+
     var selectedChatRuntimeSupportsPTY: Bool {
         agentRuntimeStore.selectedChatRuntime.supportsPTY
     }
@@ -1211,6 +1215,17 @@ final class AppModel: ObservableObject {
 
     func agentRuntimeModelOverride(for runtimeID: String) -> String {
         runtimeID == "codex" ? codexModelOverride : agentRuntimeStore.modelOverride(for: runtimeID)
+    }
+
+    func availableAgentRuntimeModelIDs(for runtimeID: String) -> [String] {
+        runtimeID == "codex" ? availableCodexModelIDs : agentRuntimeStore.availableModelIDs(for: runtimeID)
+    }
+
+    func agentRuntimeDefaultModelID(for runtimeID: String) -> String {
+        if runtimeID == "codex" {
+            return codexDefaultModelID
+        }
+        return agentRuntimeStore.profile(id: runtimeID)?.defaultModelID ?? ""
     }
 
     func agentRuntimeProviderOverride(for runtimeID: String) -> String {

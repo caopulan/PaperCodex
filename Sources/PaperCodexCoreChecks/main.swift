@@ -1663,6 +1663,19 @@ func runUILayoutSourceChecks() throws {
         "settings should expose runtime selection, enablement, diagnostics, auth, model/provider overrides, and MCP mode"
     )
     try check(
+        agentRuntimeStoreSource.contains("availableModelIDsByRuntimeID")
+            && appModelSource.contains("func availableAgentRuntimeModelIDs(for runtimeID: String) -> [String]")
+            && settingsViewSource.contains("RuntimeModelOverrideControl")
+            && settingsViewSource.contains("availableAgentRuntimeModelIDs(for: profile.id)")
+            && settingsViewSource.contains("agentRuntimeDefaultModelID(for: model.selectedEnrichmentRuntimeID)")
+            && !settingsViewSource.contains("ForEach(model.availableCodexModelIDs")
+            && chatSource.contains("availableAgentRuntimeModelIDs(for: model.selectedChatRuntimeID)")
+            && chatSource.contains("setAgentRuntimeModelOverride($0, for: model.selectedChatRuntimeID)")
+            && discoverSource.contains("availableAgentRuntimeModelIDs(for: model.selectedEnrichmentRuntimeID)")
+            && !discoverSource.contains("availableModelIDs: model.availableCodexModelIDs"),
+        "runtime model selection should use the selected runtime's discovered model catalog instead of the Codex-only list"
+    )
+    try check(
         chatSource.contains("AgentStatusLine")
             && chatSource.contains("selectedChatRuntimeDisplayName")
             && chatSource.contains("selectedChatRuntimeDiagnostic")
@@ -5174,6 +5187,39 @@ func runAgentRuntimeProfileChecks() throws {
     try check(openClaw.executableName == "openclaw", "OpenClaw Kimi profile should launch openclaw")
     try check(openClaw.defaultModelID == "kimi-coding/k2p5", "OpenClaw Kimi profile should default to the locally configured Kimi model")
     try check(openClaw.supportsStructuredOutput, "OpenClaw Kimi profile should support JSON smoke checks")
+    let openClawModelStatus = """
+    {
+      "defaultModel": "kimi-coding/k2p5",
+      "resolvedDefault": "kimi/k2p5",
+      "aliases": {
+        "Kimi K2.5": "kimi-coding/k2p5",
+        "qwen": "qwen-portal/coder-model"
+      },
+      "allowed": [
+        "codex-cli/gpt-5.2",
+        "codex-cli/gpt-5.2-codex",
+        "kimi-coding/k2p5",
+        "openai-codex/gpt-5.3-codex",
+        "openai-codex/gpt-5.4"
+      ],
+      "auth": {
+        "providersWithOAuth": ["openai-codex (1)"]
+      }
+    }
+    """
+    let openClawModels = AgentRuntimeModelCatalog.modelIDs(
+        profile: openClaw,
+        stdout: openClawModelStatus,
+        stderr: "[plugins] plugins.allow is empty"
+    )
+    try check(openClawModels == [
+        "kimi-coding/k2p5",
+        "codex-cli/gpt-5.2",
+        "codex-cli/gpt-5.2-codex",
+        "openai-codex/gpt-5.3-codex",
+        "openai-codex/gpt-5.4",
+        "qwen-portal/coder-model"
+    ], "OpenClaw runtime model catalog should expose default, allowed, and alias target models without auth/debug noise")
 
     let pi = try requiredProfile("pi", in: profilesByID)
     try check(pi.backend == .pi, "pi profile should use the pi backend")

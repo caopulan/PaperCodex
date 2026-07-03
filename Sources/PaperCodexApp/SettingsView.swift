@@ -149,9 +149,32 @@ struct SettingsView: View {
             || !draftEmbeddingAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private var codexDefaultModelLabel: String {
-        let trimmed = model.codexDefaultModelID.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Codex default" : "Codex default (\(trimmed))"
+    private var selectedExploreRuntimeUsesCodex: Bool {
+        model.selectedEnrichmentRuntimeID == "codex"
+    }
+
+    private var exploreProcessingModelOverride: String {
+        selectedExploreRuntimeUsesCodex
+            ? draftDiscoverCodexModel
+            : model.agentRuntimeModelOverride(for: model.selectedEnrichmentRuntimeID)
+    }
+
+    private var isRefreshingExploreRuntimeModels: Bool {
+        selectedExploreRuntimeUsesCodex
+            ? model.isRefreshingCodexModels
+            : model.isRefreshingAgentRuntimeDiagnostics
+    }
+
+    private var exploreProcessingSummary: String {
+        if selectedExploreRuntimeUsesCodex {
+            return "\(model.discoverCodexConcurrency) workers · Think \(model.discoverCodexReasoningEffort.displayName)"
+        }
+        let override = model.agentRuntimeModelOverride(for: model.selectedEnrichmentRuntimeID)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if override.isEmpty {
+            return "\(model.selectedEnrichmentRuntimeDisplayName) · Default"
+        }
+        return "\(model.selectedEnrichmentRuntimeDisplayName) · \(override)"
     }
 
     var body: some View {
@@ -508,6 +531,14 @@ struct SettingsView: View {
         }
     }
 
+    private func setExploreProcessingModelOverride(_ value: String) {
+        if selectedExploreRuntimeUsesCodex {
+            draftDiscoverCodexModel = value
+        } else {
+            model.setAgentRuntimeModelOverride(value, for: model.selectedEnrichmentRuntimeID)
+        }
+    }
+
     private var codexEnrichmentSettings: some View {
         settingsSection(.codexEnrichment) {
             Toggle("Auto-enrich when opening arXiv papers", isOn: $draftAutoEnrichOnOpen)
@@ -527,56 +558,58 @@ struct SettingsView: View {
 
     private var discoverCodexProcessingSettings: some View {
         settingsSection(.exploreProcessing) {
-            Picker("Model", selection: $draftDiscoverCodexModel) {
-                Text(codexDefaultModelLabel).tag("")
-                ForEach(model.availableCodexModelIDs, id: \.self) { modelID in
-                    Text(modelID).tag(modelID)
-                }
-                if !draftDiscoverCodexModel.isEmpty,
-                   !model.availableCodexModelIDs.contains(draftDiscoverCodexModel) {
-                    Text("\(draftDiscoverCodexModel) (custom)").tag(draftDiscoverCodexModel)
-                }
-            }
-            .pickerStyle(.menu)
-
-            TextField("Custom model override", text: $draftDiscoverCodexModel)
-                .textFieldStyle(.roundedBorder)
-
-            Picker("Thinking", selection: $draftDiscoverCodexReasoningEffort) {
-                ForEach(CodexReasoningEffort.allCases, id: \.self) { effort in
-                    Text(effort.displayName).tag(effort)
-                }
-            }
-            .pickerStyle(.menu)
-
-            Stepper(
-                "Concurrent Codex processes: \(draftDiscoverCodexConcurrency)",
-                value: $draftDiscoverCodexConcurrency,
-                in: 1...20
+            RuntimeModelOverrideControl(
+                defaultModelID: model.agentRuntimeDefaultModelID(for: model.selectedEnrichmentRuntimeID),
+                availableModelIDs: model.availableAgentRuntimeModelIDs(for: model.selectedEnrichmentRuntimeID),
+                modelOverride: Binding(
+                    get: { exploreProcessingModelOverride },
+                    set: { setExploreProcessingModelOverride($0) }
+                )
             )
 
+            if selectedExploreRuntimeUsesCodex {
+                Picker("Thinking", selection: $draftDiscoverCodexReasoningEffort) {
+                    ForEach(CodexReasoningEffort.allCases, id: \.self) { effort in
+                        Text(effort.displayName).tag(effort)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Stepper(
+                    "Concurrent Codex processes: \(draftDiscoverCodexConcurrency)",
+                    value: $draftDiscoverCodexConcurrency,
+                    in: 1...20
+                )
+            }
+
             HStack {
-                SettingsActionButton(kind: .primary, disabled: !isProcessingDirty) {
-                    model.setDiscoverCodexSettings(
-                        modelOverride: draftDiscoverCodexModel,
-                        concurrency: draftDiscoverCodexConcurrency,
-                        reasoningEffort: draftDiscoverCodexReasoningEffort
-                    )
-                } label: {
-                    Label(isProcessingDirty ? "Save Processing" : "Saved", systemImage: isProcessingDirty ? "checkmark" : "checkmark.circle")
+                if selectedExploreRuntimeUsesCodex {
+                    SettingsActionButton(kind: .primary, disabled: !isProcessingDirty) {
+                        model.setDiscoverCodexSettings(
+                            modelOverride: draftDiscoverCodexModel,
+                            concurrency: draftDiscoverCodexConcurrency,
+                            reasoningEffort: draftDiscoverCodexReasoningEffort
+                        )
+                    } label: {
+                        Label(isProcessingDirty ? "Save Processing" : "Saved", systemImage: isProcessingDirty ? "checkmark" : "checkmark.circle")
+                    }
                 }
 
-                SettingsActionButton(disabled: model.isRefreshingCodexModels) {
+                SettingsActionButton(disabled: isRefreshingExploreRuntimeModels) {
                     Task {
-                        await model.refreshAvailableCodexModels()
+                        if selectedExploreRuntimeUsesCodex {
+                            await model.refreshAvailableCodexModels()
+                        } else {
+                            await model.refreshAgentRuntimeDiagnostics()
+                        }
                     }
                 } label: {
-                    Label(model.isRefreshingCodexModels ? "Refreshing" : "Refresh Models", systemImage: "arrow.clockwise")
+                    Label(isRefreshingExploreRuntimeModels ? "Refreshing" : "Refresh Models", systemImage: "arrow.clockwise")
                 }
 
                 Spacer()
 
-                Text("\(model.discoverCodexConcurrency) workers · Think \(model.discoverCodexReasoningEffort.displayName)")
+                Text(exploreProcessingSummary)
                     .font(.paperCodexSystem(size: 13, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
@@ -784,12 +817,14 @@ struct SettingsView: View {
                     .frame(maxWidth: 150)
                 }
 
-                TextField(profile.defaultModelID ?? "Model override", text: Binding(
-                    get: { model.agentRuntimeModelOverride(for: profile.id) },
-                    set: { model.setAgentRuntimeModelOverride($0, for: profile.id) }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 220)
+                RuntimeModelOverrideControl(
+                    defaultModelID: model.agentRuntimeDefaultModelID(for: profile.id),
+                    availableModelIDs: model.availableAgentRuntimeModelIDs(for: profile.id),
+                    modelOverride: Binding(
+                        get: { model.agentRuntimeModelOverride(for: profile.id) },
+                        set: { model.setAgentRuntimeModelOverride($0, for: profile.id) }
+                    )
+                )
 
                 Picker("MCP", selection: Binding(
                     get: { model.agentRuntimeMCPMode(for: profile.id) },
@@ -1630,6 +1665,58 @@ private struct SettingsSimilarityCategoryItem: Identifiable {
     var connectorContinuations: [Bool]
 
     var id: String { category.id }
+}
+
+private struct RuntimeModelOverrideControl: View {
+    var defaultModelID: String
+    var availableModelIDs: [String]
+    @Binding var modelOverride: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if showsModelPicker {
+                Picker("Model", selection: $modelOverride) {
+                    Text(defaultModelLabel).tag("")
+                    ForEach(availableModelIDs, id: \.self) { modelID in
+                        Text(modelID).tag(modelID)
+                    }
+                    if !trimmedOverride.isEmpty,
+                       !availableModelIDs.contains(trimmedOverride) {
+                        Text("\(trimmedOverride) (custom)").tag(trimmedOverride)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: 190)
+            }
+
+            TextField(textFieldPlaceholder, text: $modelOverride)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: showsModelPicker ? 180 : 220)
+        }
+    }
+
+    private var showsModelPicker: Bool {
+        !availableModelIDs.isEmpty || !trimmedDefaultModelID.isEmpty || !trimmedOverride.isEmpty
+    }
+
+    private var textFieldPlaceholder: String {
+        if availableModelIDs.isEmpty, !trimmedDefaultModelID.isEmpty {
+            return trimmedDefaultModelID
+        }
+        return "Custom model"
+    }
+
+    private var defaultModelLabel: String {
+        trimmedDefaultModelID.isEmpty ? "Default" : "Default (\(trimmedDefaultModelID))"
+    }
+
+    private var trimmedDefaultModelID: String {
+        defaultModelID.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedOverride: String {
+        modelOverride.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 private struct SettingsActionButton<Label: View>: View {

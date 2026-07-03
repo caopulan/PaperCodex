@@ -47,6 +47,7 @@ final class AgentRuntimeStore: ObservableObject {
     @Published private(set) var mcpModesByRuntimeID: [String: AgentRuntimeMCPMode]
     @Published private(set) var diagnosticsByRuntimeID: [String: AgentRuntimeDiagnostic] = [:]
     @Published private(set) var authSummariesByRuntimeID: [String: String] = [:]
+    @Published private(set) var availableModelIDsByRuntimeID: [String: [String]] = [:]
     @Published private(set) var isRefreshingDiagnostics = false
     let profileConfigURL: URL?
     let profileLoadWarning: String?
@@ -99,6 +100,10 @@ final class AgentRuntimeStore: ObservableObject {
 
     func modelOverride(for runtimeID: String) -> String {
         modelOverridesByRuntimeID[runtimeID] ?? ""
+    }
+
+    func availableModelIDs(for runtimeID: String) -> [String] {
+        availableModelIDsByRuntimeID[runtimeID] ?? []
     }
 
     func providerOverride(for runtimeID: String) -> String {
@@ -180,6 +185,7 @@ final class AgentRuntimeStore: ObservableObject {
         }.value
         diagnosticsByRuntimeID = Dictionary(uniqueKeysWithValues: results.map { ($0.profileID, $0.diagnostic) })
         authSummariesByRuntimeID = Dictionary(uniqueKeysWithValues: results.map { ($0.profileID, $0.authSummary) })
+        availableModelIDsByRuntimeID = Dictionary(uniqueKeysWithValues: results.map { ($0.profileID, $0.modelIDs) })
         isRefreshingDiagnostics = false
     }
 
@@ -229,13 +235,18 @@ private struct AgentRuntimeCommandOutput: Sendable {
     var stderr: String
 }
 
-private func diagnose(_ profile: AgentRuntimeProfile) -> (profileID: String, diagnostic: AgentRuntimeDiagnostic, authSummary: String) {
+private func diagnose(_ profile: AgentRuntimeProfile) -> (profileID: String, diagnostic: AgentRuntimeDiagnostic, authSummary: String, modelIDs: [String]) {
     do {
         let executablePath = try findExecutable(for: profile)
         let versionOutput = runSafeCommand(executablePath: executablePath, arguments: versionArguments(for: profile))
         let version = firstNonEmptyLine(versionOutput.stdout) ?? firstNonEmptyLine(versionOutput.stderr)
         let authOutput = runSafeCommand(executablePath: executablePath, arguments: safeAuthStatusArguments(for: profile))
         let authSummary = authSummaryText(profile: profile, output: authOutput)
+        let modelIDs = AgentRuntimeModelCatalog.modelIDs(
+            profile: profile,
+            stdout: authOutput.stdout,
+            stderr: authOutput.stderr
+        )
         let diagnostic = AgentRuntimeDiagnostic(
             runtimeID: profile.id,
             state: versionOutput.status == 0 ? .ready : .warning,
@@ -244,7 +255,7 @@ private func diagnose(_ profile: AgentRuntimeProfile) -> (profileID: String, dia
             executablePath: executablePath,
             version: version
         )
-        return (profile.id, diagnostic, authSummary)
+        return (profile.id, diagnostic, authSummary, modelIDs)
     } catch {
         let diagnostic = AgentRuntimeDiagnostic(
             runtimeID: profile.id,
@@ -254,7 +265,7 @@ private func diagnose(_ profile: AgentRuntimeProfile) -> (profileID: String, dia
             executablePath: nil,
             version: nil
         )
-        return (profile.id, diagnostic, "Auth not checked")
+        return (profile.id, diagnostic, "Auth not checked", [])
     }
 }
 
