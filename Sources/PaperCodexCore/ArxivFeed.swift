@@ -16,19 +16,22 @@ public struct ArxivFeedResponse: Codable, Equatable, Sendable {
     public var papers: [ArxivFeedPaper]
     public var groups: [ArxivFeedGroup]?
     public var tagOptions: [String]?
+    public var sourceCategories: [String]?
 
     public init(
         date: String,
         count: Int,
         papers: [ArxivFeedPaper],
         groups: [ArxivFeedGroup]? = nil,
-        tagOptions: [String]? = nil
+        tagOptions: [String]? = nil,
+        sourceCategories: [String]? = nil
     ) {
         self.date = date
         self.count = count
         self.papers = papers
         self.groups = groups
         self.tagOptions = tagOptions
+        self.sourceCategories = Self.normalizedSourceCategories(sourceCategories)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -37,6 +40,31 @@ public struct ArxivFeedResponse: Codable, Equatable, Sendable {
         case papers
         case groups
         case tagOptions = "tag_options"
+        case sourceCategories = "source_categories"
+    }
+
+    private static func normalizedSourceCategories(_ values: [String]?) -> [String]? {
+        guard let values else {
+            return nil
+        }
+        let normalized = LocalArxivClient.normalizedSearchCategories(values)
+        return normalized.isEmpty ? nil : normalized
+    }
+
+    public var normalizedSourceCategories: [String]? {
+        Self.normalizedSourceCategories(sourceCategories)
+    }
+
+    public func coversSourceCategories(_ categories: [String]) -> Bool {
+        let target = Set(LocalArxivClient.normalizedSearchCategories(categories).map { $0.lowercased() })
+        guard !target.isEmpty else {
+            return true
+        }
+        guard let sourceCategories = normalizedSourceCategories else {
+            return false
+        }
+        let source = Set(sourceCategories.map { $0.lowercased() })
+        return target.isSubset(of: source)
     }
 }
 
@@ -159,7 +187,8 @@ public extension ArxivFeedResponse {
             count: preservingCount ? count : uniquePapers.count,
             papers: uniquePapers,
             groups: groups,
-            tagOptions: tagOptions
+            tagOptions: tagOptions,
+            sourceCategories: sourceCategories
         )
     }
 

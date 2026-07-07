@@ -258,7 +258,8 @@ private func filteredDiscoverFeed(_ feed: ArxivFeedResponse, keyword: String) ->
         count: papers.count,
         papers: papers,
         groups: deduplicatedFeed.groups,
-        tagOptions: deduplicatedFeed.tagOptions
+        tagOptions: deduplicatedFeed.tagOptions,
+        sourceCategories: deduplicatedFeed.sourceCategories
     )
     .deduplicatedByCanonicalID()
 }
@@ -283,7 +284,8 @@ private func loadCachedDiscoverSearchSnapshot(
         ))
     }
 
-    if let cachedFeed = try arxivCache.loadFeed(containing: query.dateRange) {
+    if let cachedFeed = try arxivCache.loadFeed(containing: query.dateRange),
+       cachedFeed.coversSourceCategories(query.categories) {
         let scopedFeed = cachedFeed.scoped(to: query)
         let filteredFeed = filteredDiscoverFeed(scopedFeed, keyword: query.keyword)
         guard !filteredFeed.papers.isEmpty else {
@@ -339,7 +341,8 @@ private func mergedCachedDiscoverFeed(
     return ArxivFeedResponse(
         date: query.dateRange.cacheLabel,
         count: papers.count,
-        papers: papers
+        papers: papers,
+        sourceCategories: query.categories
     )
     .deduplicatedByCanonicalID()
 }
@@ -5524,7 +5527,8 @@ final class AppModel: ObservableObject {
             count: isSearchFeed ? deduplicatedFeed.count : papers.count,
             papers: papers,
             groups: deduplicatedFeed.groups,
-            tagOptions: deduplicatedFeed.tagOptions
+            tagOptions: deduplicatedFeed.tagOptions,
+            sourceCategories: deduplicatedFeed.sourceCategories
         )
         .deduplicatedByCanonicalID(preservingCount: isSearchFeed)
     }
@@ -6071,7 +6075,8 @@ final class AppModel: ObservableObject {
                 ArxivFeedGroup(key: "neutral", count: rankedPapers.filter { $0.filterGroup == "neutral" }.count),
                 ArxivFeedGroup(key: "black", count: rankedPapers.filter { $0.filterGroup == "black" }.count)
             ],
-            tagOptions: Array(Set(rankedPapers.flatMap(\.tags))).sorted()
+            tagOptions: Array(Set(rankedPapers.flatMap(\.tags))).sorted(),
+            sourceCategories: deduplicatedFeed.sourceCategories
         )
         .deduplicatedByCanonicalID()
     }
@@ -6147,7 +6152,8 @@ final class AppModel: ObservableObject {
                 ArxivFeedGroup(key: "neutral", count: rankedPapers.filter { $0.filterGroup == "neutral" }.count),
                 ArxivFeedGroup(key: "black", count: rankedPapers.filter { $0.filterGroup == "black" }.count)
             ],
-            tagOptions: Array(Set(rankedPapers.flatMap(\.tags))).sorted()
+            tagOptions: Array(Set(rankedPapers.flatMap(\.tags))).sorted(),
+            sourceCategories: deduplicatedFeed.sourceCategories
         )
         .deduplicatedByCanonicalID(preservingCount: deduplicatedFeed.date == "search")
     }
@@ -6367,7 +6373,8 @@ final class AppModel: ObservableObject {
                 ArxivFeedGroup(key: "neutral", count: rankedPapers.filter { $0.filterGroup == "neutral" }.count),
                 ArxivFeedGroup(key: "black", count: rankedPapers.filter { $0.filterGroup == "black" }.count)
             ],
-            tagOptions: Array(Set(rankedPapers.flatMap(\.tags))).sorted()
+            tagOptions: Array(Set(rankedPapers.flatMap(\.tags))).sorted(),
+            sourceCategories: deduplicatedFeed.sourceCategories
         )
         .deduplicatedByCanonicalID(preservingCount: deduplicatedFeed.date == "search")
     }
@@ -6880,7 +6887,8 @@ private extension ArxivFeedResponse {
             count: count,
             papers: embeddedPapers,
             groups: groups,
-            tagOptions: tagOptions
+            tagOptions: tagOptions,
+            sourceCategories: sourceCategories
         )
         .deduplicatedByCanonicalID(preservingCount: date == "search")
     }

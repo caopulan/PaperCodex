@@ -186,6 +186,14 @@ public extension ArxivFeedResponse {
     }
 
     func scoped(to dateRange: DiscoverDateRange, categories: [String], dateLabel: String? = nil) -> ArxivFeedResponse {
+        if sourceCategories != nil, !coversSourceCategories(categories) {
+            return ArxivFeedResponse(
+                date: dateLabel ?? date,
+                count: 0,
+                papers: [],
+                sourceCategories: sourceCategories
+            )
+        }
         let categorySet = normalizedCategorySet(categories)
         let scopedPapers = papers.filter { paper in
             guard let paperDate = discoverDate(for: paper), dateRange.contains(paperDate) else {
@@ -199,7 +207,8 @@ public extension ArxivFeedResponse {
         return ArxivFeedResponse(
             date: dateLabel ?? date,
             count: scopedPapers.count,
-            papers: scopedPapers
+            papers: scopedPapers,
+            sourceCategories: sourceCategories
         )
         .deduplicatedByCanonicalID()
     }

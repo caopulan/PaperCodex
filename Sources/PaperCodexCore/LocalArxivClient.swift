@@ -155,7 +155,12 @@ public final class LocalArxivClient: Sendable {
         }
 
         let papers = try await fetchMetadata(ids: ids, listDate: date, listCategoriesByID: listCategoriesByID)
-        return ArxivFeedResponse(date: date, count: papers.count, papers: papers)
+        return ArxivFeedResponse(
+            date: date,
+            count: papers.count,
+            papers: papers,
+            sourceCategories: configuration.categories
+        )
             .deduplicatedByCanonicalID()
     }
 
@@ -207,10 +212,20 @@ public final class LocalArxivClient: Sendable {
         } while start < 30_000
 
         guard !papers.isEmpty else {
-            return ArxivFeedResponse(date: rangeLabel, count: 0, papers: [])
+            return ArxivFeedResponse(
+                date: rangeLabel,
+                count: 0,
+                papers: [],
+                sourceCategories: configuration.categories
+            )
         }
 
-        return ArxivFeedResponse(date: rangeLabel, count: papers.count, papers: papers)
+        return ArxivFeedResponse(
+            date: rangeLabel,
+            count: papers.count,
+            papers: papers,
+            sourceCategories: configuration.categories
+        )
             .deduplicatedByCanonicalID()
     }
 

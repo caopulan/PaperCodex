@@ -106,7 +106,8 @@ enum DiscoverCacheLoader {
                 ArxivFeedGroup(key: "neutral", count: rankedPapers.filter { $0.filterGroup == "neutral" }.count),
                 ArxivFeedGroup(key: "black", count: rankedPapers.filter { $0.filterGroup == "black" }.count)
             ],
-            tagOptions: Array(Set(rankedPapers.flatMap(\.tags))).sorted()
+            tagOptions: Array(Set(rankedPapers.flatMap(\.tags))).sorted(),
+            sourceCategories: deduplicatedFeed.sourceCategories
         )
     }
 
