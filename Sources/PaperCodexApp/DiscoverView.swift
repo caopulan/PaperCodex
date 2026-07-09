@@ -4,7 +4,7 @@ import PaperCodexCore
 import SwiftUI
 
 private let discoverMediaHorizontalPadding: CGFloat = 14
-private let discoverRouteToolbarMinHeight: CGFloat = 126
+private let discoverRouteToolbarMinHeight: CGFloat = 140
 private let discoverPaperGridHorizontalPadding: CGFloat = 10
 private let discoverPaperGridVerticalPadding: CGFloat = 8
 private let discoverPaperGridColumnSpacing: CGFloat = 16
@@ -111,6 +111,16 @@ struct DiscoverView: View {
 
     private var commonCategories: [String] {
         ["cs.CV", "cs.CL", "cs.AI", "cs.LG", "cs.RO", "stat.ML", "cs.HC", "cs.IR", "cs.SE"]
+    }
+
+    private var batchSummary: DiscoverBatchSummary {
+        DiscoverBatchSummary(
+            feed: model.arxivFeed,
+            startDate: model.discoverStartDate,
+            endDate: model.discoverEndDate,
+            selectedCategories: model.discoverSelectedCategories,
+            visibleCount: papers.count
+        )
     }
 
     private func tags(for paper: ArxivFeedPaper) -> [String] {
@@ -519,16 +529,20 @@ struct DiscoverView: View {
 
     private var toolbar: some View {
         VStack(alignment: .leading, spacing: 12) {
+            let batchSummary = self.batchSummary
+
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("探索")
                         .font(.paperCodexSystem(size: 28, weight: .semibold))
-                    Text("\(papers.count) visible · \(model.arxivFeed?.count ?? 0) found · \(model.selectedArxivDate ?? "\(model.discoverStartDate)...\(model.discoverEndDate)")")
+                    Text(batchSummary.countLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
             }
+
+            batchInfoChips(batchSummary)
 
             VStack(alignment: .leading, spacing: 8) {
                 searchAndActionRow
@@ -556,6 +570,20 @@ struct DiscoverView: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: discoverRouteToolbarMinHeight, alignment: .topLeading)
+    }
+
+    private func batchInfoChips(_ batchSummary: DiscoverBatchSummary) -> some View {
+        FlowLayout(spacing: 8) {
+            DiscoverBatchInfoChip(
+                title: batchSummary.dateRangeLabel,
+                systemImage: "calendar"
+            )
+            DiscoverBatchInfoChip(
+                title: batchSummary.sourceTagLabel,
+                systemImage: "tag"
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var searchAndActionRow: some View {
@@ -1249,6 +1277,28 @@ private struct SidebarFilterButtonStyle: ButtonStyle {
             return Color.accentColor.opacity(0.10)
         }
         return isHovering ? Color.black.opacity(0.06) : .clear
+    }
+}
+
+private struct DiscoverBatchInfoChip: View {
+    var title: String
+    var systemImage: String
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.primary.opacity(0.055))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
     }
 }
 

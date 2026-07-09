@@ -169,6 +169,42 @@ public struct DiscoverQueryResult: Codable, Equatable, Sendable {
     }
 }
 
+public struct DiscoverBatchSummary: Equatable, Sendable {
+    public var dateRangeLabel: String
+    public var sourceTags: [String]
+    public var visibleCount: Int
+    public var foundCount: Int
+
+    public init(
+        feed: ArxivFeedResponse?,
+        startDate: String,
+        endDate: String,
+        selectedCategories: [String],
+        visibleCount: Int
+    ) {
+        let feedDate = feed?.date.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !feedDate.isEmpty, feedDate != "search" {
+            dateRangeLabel = feedDate
+        } else {
+            dateRangeLabel = "\(startDate)...\(endDate)"
+        }
+
+        let feedCategories = feed?.normalizedSourceCategories ?? []
+        let categories = feedCategories.isEmpty ? selectedCategories : feedCategories
+        sourceTags = LocalArxivClient.normalizedSearchCategories(categories)
+        self.visibleCount = visibleCount
+        foundCount = feed?.count ?? visibleCount
+    }
+
+    public var countLabel: String {
+        "\(visibleCount) visible · \(foundCount) found"
+    }
+
+    public var sourceTagLabel: String {
+        sourceTags.isEmpty ? "All categories" : sourceTags.joined(separator: ", ")
+    }
+}
+
 private extension DiscoverQuery {
     func matchesDiscoverCacheFragments(for target: DiscoverQuery) -> Bool {
         let lhs = normalized

@@ -3311,6 +3311,13 @@ func runUILayoutSourceChecks() throws {
         "Discover should show removable active filter chips"
     )
     try check(
+        discoverSource.contains("DiscoverBatchSummary(")
+            && discoverSource.contains("batchSummary")
+            && discoverSource.contains("batchInfoChips")
+            && discoverSource.contains("batchSummary.sourceTagLabel"),
+        "Discover toolbar should show the current data batch date range and source tags at the top"
+    )
+    try check(
         discoverSource.contains("private let discoverRouteToolbarMinHeight: CGFloat")
             && discoverSource.contains(".frame(maxWidth: .infinity, minHeight: discoverRouteToolbarMinHeight, alignment: .topLeading)")
             && discoverSource.contains("DiscoverRouteLoadingPlaceholder")
@@ -6519,6 +6526,47 @@ func runLocalDiscoverEngineChecks() throws {
     )
     try check(queryA.normalized == queryB.normalized, "discover query normalization should ignore whitespace and duplicate order")
     try check(queryA.cacheKey == queryB.cacheKey, "discover query cache key should be stable for equivalent queries")
+
+    let feedBackedBatchSummary = DiscoverBatchSummary(
+        feed: ArxivFeedResponse(
+            date: "2026-04-27...2026-04-29",
+            count: 42,
+            papers: [],
+            sourceCategories: ["cs.CV"]
+        ),
+        startDate: "2026-04-01",
+        endDate: "2026-04-02",
+        selectedCategories: ["cs.AI"],
+        visibleCount: 17
+    )
+    try check(
+        feedBackedBatchSummary.dateRangeLabel == "2026-04-27...2026-04-29",
+        "discover batch summary should prefer the feed date range over current controls"
+    )
+    try check(
+        feedBackedBatchSummary.sourceTags == ["cs.CV"],
+        "discover batch summary should prefer feed source categories over the current category control"
+    )
+    try check(
+        feedBackedBatchSummary.countLabel == "17 visible · 42 found",
+        "discover batch summary should keep visible and found counts together"
+    )
+
+    let fallbackBatchSummary = DiscoverBatchSummary(
+        feed: nil,
+        startDate: "2026-04-01",
+        endDate: "2026-04-02",
+        selectedCategories: ["cs.AI", "cs.CV", "cs.AI"],
+        visibleCount: 0
+    )
+    try check(
+        fallbackBatchSummary.dateRangeLabel == "2026-04-01...2026-04-02",
+        "discover batch summary should fall back to the selected control range when no feed is loaded"
+    )
+    try check(
+        fallbackBatchSummary.sourceTagLabel == "cs.AI, cs.CV",
+        "discover batch summary should fall back to normalized selected category tags"
+    )
 
     func cachedDiscoverPaper(id: String, listDate: String, categories: [String], title: String) -> ArxivFeedPaper {
         ArxivFeedPaper(
