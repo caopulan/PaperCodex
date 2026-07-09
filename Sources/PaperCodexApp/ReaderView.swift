@@ -124,6 +124,7 @@ struct ReaderView: View {
                 openPDFSplit(target)
             }
         )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func secondaryPDFView(for paper: Paper) -> some View {
@@ -164,6 +165,7 @@ struct ReaderView: View {
                             openPDFSplit(target)
                         }
                     )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .transition(.opacity)
                 } else {
                     PDFSplitPreparingView(target: pendingPDFSplitTarget ?? pdfSplitTarget)

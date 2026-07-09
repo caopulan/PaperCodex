@@ -2847,6 +2847,18 @@ func runUILayoutSourceChecks() throws {
         "PDF zoom commands and trackpad magnification should leave auto-fit through a stable captured scale and preserve the visible center"
     )
     try check(
+        pdfKitSource.contains("override var intrinsicContentSize: NSSize")
+            && pdfKitSource.contains("override var fittingSize: NSSize")
+            && pdfKitSource.contains("configureSplitPaneSizing(for: view)")
+            && pdfKitSource.contains("setContentHuggingPriority(.defaultLow")
+            && pdfKitSource.contains("setContentCompressionResistancePriority(.defaultLow"),
+        "PDFKit view should not expose zoomed document size back to SwiftUI split-pane layout"
+    )
+    try check(
+        readerSource.components(separatedBy: ".frame(maxWidth: .infinity, maxHeight: .infinity)").count - 1 >= 2,
+        "primary and split PDF surfaces should fill their assigned pane instead of sizing from PDF content"
+    )
+    try check(
         pdfKitSource.contains("ResponsivePDFView") && pdfKitSource.contains("refitForCurrentWidth"),
         "PDFKit view should refit the document when its split-pane width changes"
     )

@@ -12,6 +12,14 @@ fileprivate final class ResponsivePDFView: PDFView {
         false
     }
 
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+    }
+
+    override var fittingSize: NSSize {
+        NSSize(width: 1, height: 1)
+    }
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
     }
@@ -85,6 +93,7 @@ struct PDFKitView: NSViewRepresentable {
         view.displayMode = .singlePageContinuous
         view.displayDirection = .vertical
         view.backgroundColor = .textBackgroundColor
+        configureSplitPaneSizing(for: view)
         let coordinator = context.coordinator
         view.onMouseDown = { [weak coordinator] pdfView, event in
             coordinator?.handlePDFMouseDown(in: pdfView, event: event) ?? false
@@ -149,6 +158,13 @@ struct PDFKitView: NSViewRepresentable {
 
     private func loadDocument(in view: PDFView) {
         view.document = PDFDocument(url: URL(fileURLWithPath: filePath))
+    }
+
+    private func configureSplitPaneSizing(for view: NSView) {
+        view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        view.setContentHuggingPriority(.defaultLow, for: .vertical)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
     }
 
     final class Coordinator: NSObject {
