@@ -707,7 +707,9 @@ final class AppModel: ObservableObject {
     @Published var discoverCodexModelOverride: String = UserDefaults.standard.string(forKey: discoverCodexModelOverrideDefaultsKey) ?? ""
     @Published var discoverCodexReasoningEffort: CodexReasoningEffort = loadCodexReasoningEffortFromDefaults(key: discoverCodexReasoningEffortDefaultsKey)
     @Published var discoverCodexConcurrency: Int = loadDiscoverCodexConcurrencyFromDefaults()
-    @Published var availableCodexModelIDs: [String] = []
+    @Published var availableCodexModelIDs: [String] = CodexCLI.fallbackAvailableModelIDs(
+        configuredModelID: CodexCLI.configuredDefaultModelID()
+    )
     @Published var codexDefaultModelID: String = CodexCLI.configuredDefaultModelID() ?? ""
     @Published var isRefreshingCodexModels = false
     @Published var isScanningWatchedFolders = false
@@ -4803,7 +4805,10 @@ final class AppModel: ObservableObject {
             )
         } catch {
             codexDefaultModelID = CodexCLI.configuredDefaultModelID() ?? ""
-            mergeAvailableCodexModelIDs([codexModelOverride, discoverCodexModelOverride])
+            availableCodexModelIDs = uniqueCodexModelIDs(
+                CodexCLI.fallbackAvailableModelIDs(configuredModelID: codexDefaultModelID)
+                    + [codexModelOverride, discoverCodexModelOverride]
+            )
             errorMessage = String(describing: error)
         }
     }

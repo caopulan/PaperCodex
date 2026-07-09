@@ -884,7 +884,7 @@ public struct CodexCLI: Sendable {
     }
 
     public func availableModelIDs(configText: String? = nil) throws -> [String] {
-        let version = try version()
+        let version = try? version()
         let data = try? Data(contentsOf: URL(fileURLWithPath: executablePath))
         let embeddedText = data.map { String(decoding: $0, as: UTF8.self) }
         let catalogText = try? run(arguments: ["debug", "models"])
@@ -894,6 +894,19 @@ public struct CodexCLI: Sendable {
             configText: configText ?? Self.readDefaultConfig(environment: ProcessInfo.processInfo.environment),
             catalogText: catalogText
         )
+    }
+
+    public static func fallbackAvailableModelIDs(
+        configuredModelID: String? = nil,
+        cliVersion: String? = nil
+    ) -> [String] {
+        var models = fallbackModelIDs
+        if let configuredModelID {
+            models.append(configuredModelID)
+        }
+        return Array(Set(models))
+            .filter { isSupportedModelID($0, cliVersion: cliVersion) }
+            .sorted(by: compareModelIDs)
     }
 
     public static func availableModelIDs(
@@ -932,7 +945,10 @@ public struct CodexCLI: Sendable {
     }
 
     private static let fallbackModelIDs = [
+        "gpt-5.5",
         "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.3-codex-spark",
         "gpt-5.3-codex",
         "gpt-5.2",
         "gpt-5.1-codex",
@@ -989,7 +1005,7 @@ public struct CodexCLI: Sendable {
               trimmed.hasPrefix("gpt-") else {
             return false
         }
-        if trimmed == "gpt-5.5" {
+        if trimmed == "gpt-5.5", cliVersion != nil {
             return configuredModelIssue(configText: #"model = "gpt-5.5""#, cliVersion: cliVersion) == nil
         }
         return true

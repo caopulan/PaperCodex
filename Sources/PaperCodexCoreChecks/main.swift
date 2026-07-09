@@ -2496,6 +2496,11 @@ func runUILayoutSourceChecks() throws {
         "app model should expose the configured default Codex model for chat controls"
     )
     try check(
+        appModelSource.contains("@Published var availableCodexModelIDs: [String] = CodexCLI.fallbackAvailableModelIDs")
+            && appModelSource.contains("CodexCLI.fallbackAvailableModelIDs(configuredModelID: codexDefaultModelID)"),
+        "app model should seed and recover Codex model choices from the fallback catalog instead of starting with an empty menu"
+    )
+    try check(
         chatSource.contains("availableModelIDs")
             && chatSource.contains("ForEach(availableModelIDs, id: \\.self)")
             && chatSource.contains("defaultModelLabel"),
@@ -5162,6 +5167,11 @@ func runCodexCLIChecks() throws {
         configText: nil
     )
     try check(!oldVersionModels.contains("gpt-5.5"), "Codex model detector should filter models blocked by the current CLI version")
+    let fallbackModels = CodexCLI.fallbackAvailableModelIDs(configuredModelID: "gpt-5.5")
+    try check(fallbackModels.contains("gpt-5.5"), "Codex fallback model list should keep the configured default visible before async refresh completes")
+    try check(fallbackModels.contains("gpt-5.4-mini"), "Codex fallback model list should include the current mini model")
+    try check(fallbackModels.contains("gpt-5.3-codex-spark"), "Codex fallback model list should include the current Codex Spark model")
+    try check(fallbackModels.count > 1, "Codex fallback model list should prevent the UI from collapsing to only the default model")
 }
 
 func runAgentRuntimeProfileChecks() throws {
