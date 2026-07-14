@@ -2851,10 +2851,27 @@ func runUILayoutSourceChecks() throws {
             && !pdfKitSource.contains("pdfView.scaleFactor = max(pdfView.scaleFactor / 1.18"),
         "PDF zoom commands and trackpad magnification should leave auto-fit through a stable captured scale and preserve the visible center"
     )
+    let pdfMagnifyHandlerRange = try require(
+        pdfKitSource.range(of: "fileprivate func handlePDFMagnify"),
+        "PDF magnify handler source should exist"
+    )
+    let pdfMagnifyHandlerEndRange = try require(
+        pdfKitSource.range(
+            of: "private func showCitationPreviewPopover",
+            range: pdfMagnifyHandlerRange.upperBound..<pdfKitSource.endIndex
+        ),
+        "PDF magnify handler should be followed by citation preview code"
+    )
+    let pdfMagnifyHandlerSource = String(pdfKitSource[pdfMagnifyHandlerRange.lowerBound..<pdfMagnifyHandlerEndRange.lowerBound])
     try check(
         pdfKitSource.contains("configurePDFScrollView(_ scrollView: NSScrollView)")
-            && pdfKitSource.contains("scrollView.allowsMagnification = false"),
-        "PDFKit view should prevent the internal scroll view from treating trackpad pinch as transient magnification"
+            && pdfKitSource.contains("scrollView.allowsMagnification = true")
+            && pdfKitSource.contains("scrollView.minMagnification = Self.manualZoomMinimumScale")
+            && pdfKitSource.contains("scrollView.maxMagnification = Self.manualZoomMaximumScale")
+            && pdfKitSource.contains("prepareForNativeMagnification()")
+            && pdfMagnifyHandlerSource.contains("return false")
+            && !pdfMagnifyHandlerSource.contains("applyManualZoom"),
+        "trackpad PDF pinch should use native continuous PDFKit magnification while disabling auto-fit snapping"
     )
     try check(
         pdfKitSource.contains("override var intrinsicContentSize: NSSize")

@@ -120,6 +120,12 @@ struct PDFKitView: NSViewRepresentable {
             name: .PDFViewPageChanged,
             object: view
         )
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.scaleChanged(_:)),
+            name: .PDFViewScaleChanged,
+            object: view
+        )
         loadDocument(in: view)
         context.coordinator.documentDidLoad()
         let readingContextID = readingContextID
@@ -185,7 +191,9 @@ struct PDFKitView: NSViewRepresentable {
         private var pendingWidthRefit: DispatchWorkItem?
         private var pendingDocumentViewportReset = false
         private var isApplyingReadingPosition = false
+        private var isApplyingFitWidthScale = false
         private var shouldFitWidthOnResize = true
+        private var lastFitWidthScale: CGFloat?
         private var referenceResolver = PDFReferenceResolver(pageTexts: [:])
         private var referenceResolverBuildTask: Task<Void, Never>?
         private var referenceResolverBuildID = UUID()
@@ -226,6 +234,7 @@ struct PDFKitView: NSViewRepresentable {
             lastReportedPosition = nil
             pendingDocumentViewportReset = true
             shouldFitWidthOnResize = true
+            lastFitWidthScale = nil
             referenceResolver = PDFReferenceResolver(pageTexts: [:])
             referenceResolverBuildTask?.cancel()
             if let documentURL = pdfView?.document?.documentURL {
@@ -278,7 +287,9 @@ struct PDFKitView: NSViewRepresentable {
 
         @MainActor
         private func configurePDFScrollView(_ scrollView: NSScrollView) {
-            scrollView.allowsMagnification = false
+            scrollView.allowsMagnification = true
+            scrollView.minMagnification = Self.manualZoomMinimumScale
+            scrollView.maxMagnification = Self.manualZoomMaximumScale
         }
 
         @MainActor
@@ -388,11 +399,7 @@ struct PDFKitView: NSViewRepresentable {
             }
             let viewportCenter = currentViewportPosition()
             let currentScale = resolvedScaleFactor()
-            shouldFitWidthOnResize = false
-            pendingWidthRefit?.cancel()
-            pdfView.autoScales = false
-            pdfView.minScaleFactor = manualZoomLowerBound()
-            pdfView.maxScaleFactor = manualZoomUpperBound()
+            prepareForManualZoom()
 
             let targetScale = clampedManualScale(currentScale * multiplier)
             if targetScale.isFinite,
@@ -401,6 +408,26 @@ struct PDFKitView: NSViewRepresentable {
                 pdfView.scaleFactor = targetScale
             }
             restoreViewportCenter(viewportCenter)
+        }
+
+        @MainActor
+        private func prepareForManualZoom() {
+            guard let pdfView else {
+                return
+            }
+            shouldFitWidthOnResize = false
+            pendingWidthRefit?.cancel()
+            pdfView.autoScales = false
+            pdfView.minScaleFactor = manualZoomLowerBound()
+            pdfView.maxScaleFactor = manualZoomUpperBound()
+            if let scrollView = findScrollView(in: pdfView) {
+                configurePDFScrollView(scrollView)
+            }
+        }
+
+        @MainActor
+        private func prepareForNativeMagnification() {
+            prepareForManualZoom()
         }
 
         @MainActor
@@ -556,12 +583,18 @@ struct PDFKitView: NSViewRepresentable {
                   pdfView.document != nil else {
                 return
             }
-            pdfView.autoScales = true
             let targetScale = pdfView.scaleFactorForSizeToFit
             if targetScale.isFinite,
-               targetScale > 0,
-               abs(pdfView.scaleFactor - targetScale) > 0.005 {
-                pdfView.scaleFactor = targetScale
+               targetScale > 0 {
+                isApplyingFitWidthScale = true
+                pdfView.autoScales = false
+                pdfView.minScaleFactor = manualZoomLowerBound()
+                pdfView.maxScaleFactor = manualZoomUpperBound()
+                if abs(pdfView.scaleFactor - targetScale) > 0.005 {
+                    pdfView.scaleFactor = targetScale
+                }
+                lastFitWidthScale = targetScale
+                isApplyingFitWidthScale = false
             }
             reportDocumentStatus()
         }
@@ -714,11 +747,8 @@ struct PDFKitView: NSViewRepresentable {
             guard magnification.isFinite else {
                 return true
             }
-            let multiplier = max(0.05, 1 + magnification)
-            applyManualZoom(multiplier: multiplier)
-            scheduleViewportReport()
-            reportDocumentStatus()
-            return true
+            prepareForNativeMagnification()
+            return false
         }
 
         @MainActor
@@ -831,6 +861,23 @@ struct PDFKitView: NSViewRepresentable {
 
         @MainActor
         @objc func pageChanged(_ notification: Notification) {
+            scheduleViewportReport()
+            reportDocumentStatus()
+        }
+
+        @MainActor
+        @objc func scaleChanged(_ notification: Notification) {
+            guard !isApplyingFitWidthScale else {
+                scheduleViewportReport()
+                reportDocumentStatus()
+                return
+            }
+            if shouldFitWidthOnResize,
+               let pdfView,
+               let lastFitWidthScale,
+               abs(pdfView.scaleFactor - lastFitWidthScale) > 0.005 {
+                prepareForManualZoom()
+            }
             scheduleViewportReport()
             reportDocumentStatus()
         }
