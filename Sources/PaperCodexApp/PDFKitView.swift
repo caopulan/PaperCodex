@@ -260,6 +260,7 @@ struct PDFKitView: NSViewRepresentable {
             guard let scrollView = findScrollView(in: pdfView) else {
                 return
             }
+            configurePDFScrollView(scrollView)
             let clipView = scrollView.contentView
             guard observedClipView !== clipView else {
                 return
@@ -273,6 +274,11 @@ struct PDFKitView: NSViewRepresentable {
                 name: NSView.boundsDidChangeNotification,
                 object: clipView
             )
+        }
+
+        @MainActor
+        private func configurePDFScrollView(_ scrollView: NSScrollView) {
+            scrollView.allowsMagnification = false
         }
 
         @MainActor

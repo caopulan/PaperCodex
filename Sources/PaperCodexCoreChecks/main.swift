@@ -2852,6 +2852,11 @@ func runUILayoutSourceChecks() throws {
         "PDF zoom commands and trackpad magnification should leave auto-fit through a stable captured scale and preserve the visible center"
     )
     try check(
+        pdfKitSource.contains("configurePDFScrollView(_ scrollView: NSScrollView)")
+            && pdfKitSource.contains("scrollView.allowsMagnification = false"),
+        "PDFKit view should prevent the internal scroll view from treating trackpad pinch as transient magnification"
+    )
+    try check(
         pdfKitSource.contains("override var intrinsicContentSize: NSSize")
             && pdfKitSource.contains("override var fittingSize: NSSize")
             && pdfKitSource.contains("configureSplitPaneSizing(for: view)")
