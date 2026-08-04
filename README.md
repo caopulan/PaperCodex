@@ -340,7 +340,7 @@ codex --version
 codex exec --help
 ```
 
-Episteme checks for `codex` in `PATH` and common install locations, including the Codex app bundle and Homebrew paths.
+Episteme checks for `codex` in `PATH` and common install locations, including the ChatGPT and Codex app bundles, `~/.local/bin`, and Homebrew paths.
 
 ### Reset local development data
 

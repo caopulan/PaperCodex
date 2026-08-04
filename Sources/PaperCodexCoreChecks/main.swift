@@ -4949,6 +4949,23 @@ func runCodexCLIChecks() throws {
         "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"
     ])
     try check(finderCodexPath == localCodex.path, "Codex resolver should find ~/.local/bin/codex when macOS app launches with a system-only PATH")
+    let chatGPTLaunchHome = isolatedWorkingDirectory.appendingPathComponent("chatgpt-home", isDirectory: true)
+    let chatGPTCodex = chatGPTLaunchHome
+        .appendingPathComponent("Applications/ChatGPT.app/Contents/Resources/codex")
+    try FileManager.default.createDirectory(
+        at: chatGPTCodex.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try "#!/bin/sh\nprintf 'codex-cli 999.0.0\\n'\n".write(to: chatGPTCodex, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: chatGPTCodex.path)
+    let chatGPTCodexPath = try CodexCLI.findCodexExecutable(environment: [
+        "HOME": chatGPTLaunchHome.path,
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"
+    ])
+    try check(
+        chatGPTCodexPath == chatGPTCodex.path,
+        "Codex resolver should find the CLI bundled inside ChatGPT when macOS app launches with a system-only PATH"
+    )
     let start = cli.startArguments(prompt: "hello", workspacePath: "/tmp/session-a")
     try check(start == ["exec", "--skip-git-repo-check", "--json", "--enable", "image_generation", "-C", "/tmp/session-a", "hello"], "start args should allow non-git session workspaces with image generation enabled")
     let startWithStdinPrompt = cli.startArguments(prompt: "hello", workspacePath: "/tmp/session-a", promptTransport: .standardInput)

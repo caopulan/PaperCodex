@@ -637,6 +637,10 @@ public struct CodexCLI: Sendable {
     ) throws -> String {
         let pathValue = environment["PATH"] ?? ""
         let localUserPath = localUserCodexPath(environment: environment)
+        let userChatGPTPath = userApplicationCodexPath(
+            applicationName: "ChatGPT.app",
+            environment: environment
+        )
         if !preferWorkspaceImageOutput,
            isSystemOnlyPath(pathValue),
            FileManager.default.isExecutableFile(atPath: localUserPath) {
@@ -647,6 +651,8 @@ public struct CodexCLI: Sendable {
             .map { String($0) + "/codex" }
             + [
                 localUserPath,
+                userChatGPTPath,
+                "/Applications/ChatGPT.app/Contents/Resources/codex",
                 "/Applications/Codex.app/Contents/Resources/codex",
                 "/opt/homebrew/bin/codex",
                 "/usr/local/bin/codex"
@@ -678,6 +684,20 @@ public struct CodexCLI: Sendable {
         let home = environment["HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path
         return URL(fileURLWithPath: home, isDirectory: true)
             .appendingPathComponent(".local/bin/codex")
+            .path
+    }
+
+    private static func userApplicationCodexPath(
+        applicationName: String,
+        environment: [String: String]
+    ) -> String {
+        let home = environment["HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path
+        return URL(fileURLWithPath: home, isDirectory: true)
+            .appendingPathComponent("Applications", isDirectory: true)
+            .appendingPathComponent(applicationName, isDirectory: true)
+            .appendingPathComponent("Contents", isDirectory: true)
+            .appendingPathComponent("Resources", isDirectory: true)
+            .appendingPathComponent("codex")
             .path
     }
 
